@@ -1,0 +1,8 @@
+{
+  "name": "Chinese Chess Online",
+  "description": "A professional, responsive Chinese Chess game with traditional styling, move validation, undo support, and bilingual interface.",
+  "requestFramePermissions": [],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
