@@ -12,8 +12,8 @@ import {
 } from './types';
 import { Board } from './components/Board';
 import { getValidMoves, isGameOver } from './utils/rules';
-import { findBestMove } from './utils/ai';
-import { RotateCcw, Undo, Flag, Languages, Info, Users, Bot } from 'lucide-react';
+import { BotAPI } from './engine/BotAPI';
+import { RotateCcw, Undo, Flag, Languages, Info, Users, Bot, Sliders } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 
 const createEmptyBoard = (): BoardState => 
@@ -47,6 +47,10 @@ const t = {
     pvp: '双人对战',
     pve: '人机对局',
     aiThinking: 'AI正在思考...',
+    easy: '简单',
+    normal: '普通',
+    hard: '挑战',
+    difficultyLabel: 'AI 难度',
   },
   en: {
     title: 'Chinese Chess Online',
@@ -62,6 +66,10 @@ const t = {
     pvp: 'PvP Mode',
     pve: 'AI Mode',
     aiThinking: 'AI is thinking...',
+    easy: 'Easy',
+    normal: 'Medium',
+    hard: 'Hard',
+    difficultyLabel: 'AI Level',
   }
 };
 
@@ -74,6 +82,7 @@ export default function App() {
   const [winner, setWinner] = useState<PlayerColor | 'draw' | null>(null);
   const [lang, setLang] = useState<'zh' | 'en'>('zh');
   const [mode, setMode] = useState<GameMode>(GameMode.PVP);
+  const [difficulty, setDifficulty] = useState<number>(3); // 2 = Easy, 3 = Normal, 4 = Hard
   const [isAiThinking, setIsAiThinking] = useState(false);
 
   const curT = t[lang];
@@ -135,24 +144,29 @@ export default function App() {
   useEffect(() => {
     if (mode === GameMode.PVE && turn === 'black' && !winner && !isAiThinking) {
       setIsAiThinking(true);
-      // Add a small delay for "thinking" feel
+      // Small timeout to let UI update and render the player's last move first
       const timer = setTimeout(() => {
-        const bestMove = findBestMove(board, 'black', 3);
-        if (bestMove) {
-          const piece = board[bestMove.from.r][bestMove.from.c];
-          if (piece) {
-            setHistory(prev => [...prev, board]);
-            executeMove(bestMove.to.r, bestMove.to.c, piece, board);
+        try {
+          const bestMove = BotAPI.get_ai_move(board, 'black', difficulty);
+          if (bestMove) {
+            const piece = board[bestMove.from.r][bestMove.from.c];
+            if (piece) {
+              setHistory(prev => [...prev, board]);
+              executeMove(bestMove.to.r, bestMove.to.c, piece, board);
+            }
+          } else {
+            // No moves means Checkmate/Defeat for black
+            setWinner('red');
           }
-        } else {
-          // If no moves, black loses or draw
-          setWinner('red');
+        } catch (e) {
+          console.error("AI engine error", e);
+        } finally {
+          setIsAiThinking(false);
         }
-        setIsAiThinking(false);
-      }, 600);
+      }, 300);
       return () => clearTimeout(timer);
     }
-  }, [mode, turn, winner, board, executeMove, isAiThinking]);
+  }, [mode, turn, winner, executeMove]);
 
   const onSquareClick = useCallback((r: number, c: number) => {
     if (winner || isAiThinking) return;
@@ -222,6 +236,38 @@ export default function App() {
           </button>
         </div>
       </div>
+
+      {/* Difficulty Setting for AI Mode */}
+      <AnimatePresence>
+        {mode === GameMode.PVE && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            className="w-full max-w-[600px] mb-4 bg-stone-900/60 border border-stone-800/80 rounded-xl p-3 flex items-center justify-between gap-2 overflow-hidden"
+          >
+            <div className="flex items-center gap-2 text-stone-400 text-xs">
+              <Sliders size={14} className="text-stone-500" />
+              <span>{curT.difficultyLabel}:</span>
+            </div>
+            <div className="flex bg-stone-950 p-0.5 rounded-lg border border-stone-800">
+              {[
+                { val: 2, label: curT.easy },
+                { val: 3, label: curT.normal },
+                { val: 4, label: curT.hard },
+              ].map(opt => (
+                <button
+                  key={opt.val}
+                  onClick={() => setDifficulty(opt.val)}
+                  className={`px-3 py-1 rounded-md text-xs font-semibold select-none transition-all ${difficulty === opt.val ? 'bg-yellow-600/90 text-white shadow-md' : 'text-stone-400 hover:text-stone-200'}`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Thinking Indicator */}
       <AnimatePresence>
